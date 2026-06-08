@@ -1553,7 +1553,7 @@ async function adminLoad() {
       <td style="padding:12px; vertical-align:top; font-family:'DM Mono',monospace; font-weight:600; color:var(--green-dark);">R$ ${d.total}</td>
       <td style="padding:12px; vertical-align:top;">
         <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-          <select onchange="adminChangeStatus('${d.id}', this.value, this)" style="padding:5px 8px; border-radius:6px; border:1px solid ${statusColor}; background:${statusBg}; color:${statusColor}; font-size:12px; cursor:pointer; font-family:'DM Sans',sans-serif;">
+          <select onchange="adminChangeStatus('${d.id}', this.value, this)" data-prev="${d.status}" style="padding:5px 8px; border-radius:6px; border:1px solid ${statusColor}; background:${statusBg}; color:${statusColor}; font-size:12px; cursor:pointer; font-family:'DM Sans',sans-serif;">
             <option value="confirmado" ${d.status==='confirmado'?'selected':''}>Confirmado</option>
             <option value="concluido" ${d.status==='concluido'?'selected':''}>Concluído</option>
             <option value="cancelado" ${d.status==='cancelado'?'selected':''}>Cancelado</option>
@@ -1566,6 +1566,20 @@ async function adminLoad() {
 }
 
 async function adminChangeStatus(id, status, sel) {
+  if (status === 'cancelado') {
+    if (!window.confirm('Cancelar e remover este agendamento?')) {
+      sel.value = sel.dataset.prev;
+      return;
+    }
+    sel.disabled = true;
+    await fetch(`${SB_URL}/rest/v1/agendamentos?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+    });
+    showNotif('Agendamento cancelado e removido!');
+    adminLoad();
+    return;
+  }
   sel.disabled = true;
   await sbUpdateStatus(id, status);
   sel.disabled = false;
@@ -1616,16 +1630,32 @@ async function adminSaveMensalista() {
   const telefone = document.getElementById('m-tel').value.trim();
   const barbeiro = document.getElementById('m-barbeiro').value;
   const observacao = document.getElementById('m-obs').value.trim();
+  const data = document.getElementById('m-data').value;
+  const horario = document.getElementById('m-horario').value;
   if (!nome || !telefone || !barbeiro) { showNotif('Preencha nome, telefone e barbeiro.'); return; }
   await fetch(`${SB_URL}/rest/v1/mensalistas`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Prefer': 'return=minimal' },
     body: JSON.stringify({ nome, telefone, barbeiro, observacao })
   });
+  if (data && horario) {
+    await sbInsert({
+      cliente_nome: nome,
+      cliente_telefone: telefone,
+      barbeiro: barbeiro,
+      servicos: 'Mensalista',
+      total: 0,
+      data_agendamento: data,
+      horario: horario,
+      status: 'confirmado'
+    });
+  }
   document.getElementById('m-nome').value = '';
   document.getElementById('m-tel').value = '';
   document.getElementById('m-obs').value = '';
-  showNotif('Mensalista cadastrado!');
+  document.getElementById('m-data').value = '';
+  document.getElementById('m-horario').value = '';
+  showNotif(data && horario ? 'Mensalista cadastrado e horário bloqueado!' : 'Mensalista cadastrado!');
   adminLoadMensalistas();
 }
 
@@ -1819,6 +1849,31 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
           <div>
             <label style="font-size:11px; font-family:'DM Mono',monospace; letter-spacing:1px; color:var(--text-muted); text-transform:uppercase;">Observação</label>
             <input id="m-obs" type="text" placeholder="Ex: toda terça às 10h" style="width:100%; margin-top:4px; padding:10px 12px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; background:var(--white); font-family:'DM Sans',sans-serif; outline:none;">
+          </div>
+          <div>
+            <label style="font-size:11px; font-family:'DM Mono',monospace; letter-spacing:1px; color:var(--text-muted); text-transform:uppercase;">Data do Agendamento</label>
+            <input id="m-data" type="date" style="width:100%; margin-top:4px; padding:10px 12px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; background:var(--white); font-family:'DM Sans',sans-serif; outline:none;">
+          </div>
+          <div>
+            <label style="font-size:11px; font-family:'DM Mono',monospace; letter-spacing:1px; color:var(--text-muted); text-transform:uppercase;">Horário</label>
+            <select id="m-horario" style="width:100%; margin-top:4px; padding:10px 12px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; background:var(--white); font-family:'DM Sans',sans-serif; outline:none;">
+              <option value="">— sem agendamento —</option>
+              <option value="10:00">10:00</option>
+              <option value="10:45">10:45</option>
+              <option value="11:30">11:30</option>
+              <option value="12:15">12:15</option>
+              <option value="13:00">13:00</option>
+              <option value="13:45">13:45</option>
+              <option value="14:30">14:30</option>
+              <option value="15:15">15:15</option>
+              <option value="16:00">16:00</option>
+              <option value="16:45">16:45</option>
+              <option value="17:30">17:30</option>
+              <option value="18:15">18:15</option>
+              <option value="19:00">19:00</option>
+              <option value="19:45">19:45</option>
+              <option value="20:30">20:30</option>
+            </select>
           </div>
         </div>
         <button onclick="adminSaveMensalista()" style="background:var(--green); color:#fff; border:none; padding:10px 24px; border-radius:8px; font-size:14px; font-weight:500; cursor:pointer; font-family:'DM Sans',sans-serif;">+ Cadastrar</button>
