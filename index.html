@@ -1558,7 +1558,7 @@ async function adminLoad() {
             <option value="concluido" ${d.status==='concluido'?'selected':''}>Concluído</option>
             <option value="cancelado" ${d.status==='cancelado'?'selected':''}>Cancelado</option>
           </select>
-          ${d.status === 'cancelado' ? `<button onclick="adminDelete('${d.id}')" style="background:#fee;color:#c44;border:1px solid #c44;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;">🗑 Excluir</button>` : ''}
+          <button onclick="adminDelete('${d.id}')" style="background:#fee;color:#c44;border:1px solid #c44;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;" title="Excluir">🗑</button>
         </div>
       </td>
     </tr>`;
@@ -1566,36 +1566,32 @@ async function adminLoad() {
 }
 
 async function adminChangeStatus(id, status, sel) {
-  if (status === 'cancelado') {
-    if (!window.confirm('Cancelar e remover este agendamento?')) {
-      sel.value = sel.dataset.prev;
-      return;
-    }
-    sel.disabled = true;
-    await fetch(`${SB_URL}/rest/v1/agendamentos?id=eq.${id}`, {
-      method: 'DELETE',
-      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
-    });
-    showNotif('Agendamento cancelado e removido!');
-    adminLoad();
-    return;
-  }
   sel.disabled = true;
-  await sbUpdateStatus(id, status);
+  try {
+    await sbUpdateStatus(id, status);
+    showNotif('Status atualizado!');
+  } catch(e) {
+    showNotif('Erro ao atualizar status.');
+    sel.value = sel.dataset.prev;
+  }
   sel.disabled = false;
-  showNotif('Status atualizado!');
   adminLoad();
 }
 
 
 async function adminDelete(id) {
-  if (!window.confirm('Excluir este agendamento cancelado permanentemente?')) return;
-  await fetch(`${SB_URL}/rest/v1/agendamentos?id=eq.${id}`, {
-    method: 'DELETE',
-    headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
-  });
-  showNotif('Agendamento excluído!');
-  adminLoad();
+  if (!window.confirm('Excluir este agendamento permanentemente?')) return;
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/agendamentos?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+    });
+    if (!res.ok) { const e = await res.text(); throw new Error(e); }
+    showNotif('Agendamento excluído!');
+    adminLoad();
+  } catch(e) {
+    showNotif('Erro ao excluir: ' + e.message);
+  }
 }
 
 // ── MENSALISTAS ──────────────────────────────────────────
@@ -1629,9 +1625,11 @@ async function adminSaveMensalista() {
   const nome = document.getElementById('m-nome').value.trim();
   const telefone = document.getElementById('m-tel').value.trim();
   const barbeiro = document.getElementById('m-barbeiro').value;
-  const observacao = document.getElementById('m-obs').value.trim();
+  const servico = document.getElementById('m-servico').value;
+  const obs = document.getElementById('m-obs').value.trim();
   const data = document.getElementById('m-data').value;
   const horario = document.getElementById('m-horario').value;
+  const observacao = [servico, obs].filter(Boolean).join(' — ');
   if (!nome || !telefone || !barbeiro) { showNotif('Preencha nome, telefone e barbeiro.'); return; }
   await fetch(`${SB_URL}/rest/v1/mensalistas`, {
     method: 'POST',
@@ -1643,7 +1641,7 @@ async function adminSaveMensalista() {
       cliente_nome: nome,
       cliente_telefone: telefone,
       barbeiro: barbeiro,
-      servicos: 'Mensalista',
+      servicos: servico || 'Mensalista',
       total: 0,
       data_agendamento: data,
       horario: horario,
@@ -1652,6 +1650,7 @@ async function adminSaveMensalista() {
   }
   document.getElementById('m-nome').value = '';
   document.getElementById('m-tel').value = '';
+  document.getElementById('m-servico').value = '';
   document.getElementById('m-obs').value = '';
   document.getElementById('m-data').value = '';
   document.getElementById('m-horario').value = '';
@@ -1661,12 +1660,17 @@ async function adminSaveMensalista() {
 
 async function adminDeleteMensalista(id) {
   if (!window.confirm('Remover mensalista?')) return;
-  await fetch(`${SB_URL}/rest/v1/mensalistas?id=eq.${id}`, {
-    method: 'DELETE',
-    headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
-  });
-  showNotif('Mensalista removido!');
-  adminLoadMensalistas();
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/mensalistas?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+    });
+    if (!res.ok) { const e = await res.text(); throw new Error(e); }
+    showNotif('Mensalista removido!');
+    adminLoadMensalistas();
+  } catch(e) {
+    showNotif('Erro ao remover: ' + e.message);
+  }
 }
 
 // ── DIAS BLOQUEADOS ──────────────────────────────────────
@@ -1847,6 +1851,24 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
             </select>
           </div>
           <div>
+            <label style="font-size:11px; font-family:'DM Mono',monospace; letter-spacing:1px; color:var(--text-muted); text-transform:uppercase;">Tipo de Corte</label>
+            <select id="m-servico" style="width:100%; margin-top:4px; padding:10px 12px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; background:var(--white); font-family:'DM Sans',sans-serif; outline:none;">
+              <option value="">Selecione...</option>
+              <option>Corte Simples</option>
+              <option>Corte Disfarçado (Máquina)</option>
+              <option>Corte Tesoura</option>
+              <option>Barba</option>
+              <option>Corte + Barba</option>
+              <option>Cavanhaque</option>
+              <option>Pezinho</option>
+              <option>Pigmentação</option>
+              <option>Reflexo</option>
+              <option>Nevou</option>
+              <option>Colorido</option>
+              <option>Alinhamento de Fios</option>
+            </select>
+          </div>
+          <div>
             <label style="font-size:11px; font-family:'DM Mono',monospace; letter-spacing:1px; color:var(--text-muted); text-transform:uppercase;">Observação</label>
             <input id="m-obs" type="text" placeholder="Ex: toda terça às 10h" style="width:100%; margin-top:4px; padding:10px 12px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; background:var(--white); font-family:'DM Sans',sans-serif; outline:none;">
           </div>
@@ -1884,7 +1906,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
             <th style="padding:10px 12px; font-family:'DM Mono',monospace; font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:600;">Nome</th>
             <th style="padding:10px 12px; font-family:'DM Mono',monospace; font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:600;">Telefone</th>
             <th style="padding:10px 12px; font-family:'DM Mono',monospace; font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:600;">Barbeiro</th>
-            <th style="padding:10px 12px; font-family:'DM Mono',monospace; font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:600;">Observação</th>
+            <th style="padding:10px 12px; font-family:'DM Mono',monospace; font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:600;">Tipo de Corte / Obs</th>
             <th style="padding:10px 12px;"></th>
           </tr></thead>
           <tbody id="mensalistas-tbody">
