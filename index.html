@@ -1301,7 +1301,7 @@ async function sbInsert(row) {
 }
 
 async function sbFetch(filters = '') {
-  const res = await fetch(`${SB_URL}/rest/v1/agendamentos?order=data_agendamento.asc,horario.asc${filters}&select=*`, {
+  const res = await fetch(`${SB_URL}/rest/v1/agendamentos?order=data_agendamento.asc,horario.asc&status=neq.excluido${filters}&select=*`, {
     headers: {
       'apikey': SB_KEY,
       'Authorization': `Bearer ${SB_KEY}`
@@ -1580,11 +1580,12 @@ async function adminChangeStatus(id, status, sel) {
 
 
 async function adminDelete(id) {
-  if (!window.confirm('Excluir este agendamento permanentemente?')) return;
+  if (!window.confirm('Excluir este agendamento?')) return;
   try {
     const res = await fetch(`${SB_URL}/rest/v1/agendamentos?id=eq.${id}`, {
-      method: 'DELETE',
-      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` },
+      body: JSON.stringify({ status: 'excluido' })
     });
     if (!res.ok) { const e = await res.text(); throw new Error(e); }
     showNotif('Agendamento excluído!');
@@ -1637,15 +1638,28 @@ async function adminSaveMensalista() {
     body: JSON.stringify({ nome, telefone, barbeiro, observacao })
   });
   if (data && horario) {
-    await sbInsert({
-      cliente_nome: nome,
-      cliente_telefone: telefone,
-      barbeiro: barbeiro,
-      servicos: servico || 'Mensalista',
-      total: 0,
-      data_agendamento: data,
-      horario: horario,
-      status: 'confirmado'
+    const startDate = new Date(data + 'T12:00:00');
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + 6);
+    const rows = [];
+    const cur = new Date(startDate);
+    while (cur <= endDate) {
+      rows.push({
+        cliente_nome: nome,
+        cliente_telefone: telefone,
+        barbeiro: barbeiro,
+        servicos: servico || 'Mensalista',
+        total: 0,
+        data_agendamento: cur.toISOString().split('T')[0],
+        horario: horario,
+        status: 'confirmado'
+      });
+      cur.setDate(cur.getDate() + 7);
+    }
+    await fetch(`${SB_URL}/rest/v1/agendamentos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}`, 'Prefer': 'return=minimal' },
+      body: JSON.stringify(rows)
     });
   }
   document.getElementById('m-nome').value = '';
