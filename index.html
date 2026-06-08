@@ -1595,6 +1595,24 @@ async function adminDelete(id) {
   }
 }
 
+async function adminDeleteAllCancelados() {
+  const data = await sbFetch('&status=eq.cancelado');
+  if (!data.length) { showNotif('Nenhum cancelado encontrado.'); return; }
+  if (!window.confirm(`Excluir todos os ${data.length} agendamento(s) cancelado(s)?`)) return;
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/agendamentos?status=eq.cancelado`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` },
+      body: JSON.stringify({ status: 'excluido' })
+    });
+    if (!res.ok) { const e = await res.text(); throw new Error(e); }
+    showNotif(`${data.length} cancelado(s) removido(s)!`);
+    adminLoad();
+  } catch(e) {
+    showNotif('Erro: ' + e.message);
+  }
+}
+
 // ── MENSALISTAS ──────────────────────────────────────────
 async function adminLoadMensalistas() {
   const res = await fetch(`${SB_URL}/rest/v1/mensalistas?order=nome.asc&select=*`, {
@@ -1822,6 +1840,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
           <option value="concluido">Concluído</option>
           <option value="cancelado">Cancelado</option>
         </select>
+        <button onclick="adminDeleteAllCancelados()" style="padding:8px 16px; border-radius:8px; border:1.5px solid #c44; background:#fee; color:#c44; font-size:13px; font-weight:500; cursor:pointer; font-family:'DM Sans',sans-serif; white-space:nowrap;">🗑 Limpar Cancelados</button>
       </div>
       <div id="admin-stats" style="display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; margin-bottom:1.5rem;"></div>
       <div style="overflow-x:auto;">
