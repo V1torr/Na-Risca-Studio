@@ -847,12 +847,12 @@
       </div>
       <div class="hours-row">
         <span class="day-name">Quinta</span>
-        <span class="day-hours">10:00 – 21:00</span>
+        <span class="day-hours">10:00 – 21:45</span>
         <span class="status-badge status-open" id="badge-quinta">—</span>
       </div>
       <div class="hours-row">
         <span class="day-name">Sexta</span>
-        <span class="day-hours">10:00 – 21:00</span>
+        <span class="day-hours">10:00 – 21:45</span>
         <span class="status-badge status-open" id="badge-sexta">—</span>
       </div>
       <div class="hours-row">
@@ -1084,7 +1084,7 @@ function updateStatusBadges() {
   const day = now.getDay(); // 0=Sun,1=Mon,...6=Sat
   const h = now.getHours() + now.getMinutes() / 60;
   const days = ['badge-terca','badge-quarta','badge-quinta','badge-sexta','badge-sabado'];
-  const ends = [19, 19, 21, 21, 18];
+  const ends = [19, 19, 21.75, 21.75, 18];
   const dayMap = [null, null, 0, 1, 2, 3, 4]; // day index in days array
   days.forEach((id, i) => {
     const el = document.getElementById(id);
@@ -1194,7 +1194,7 @@ async function selectDate(cell, date) {
 
 async function renderTimeSlots(date) {
   const dow = date.getDay();
-  let maxH = 21;
+  let maxH = 22; // Quinta e Sexta: último slot 21:45
   if (dow === 2) maxH = 19; // Terça
   if (dow === 3) maxH = 19; // Quarta
   if (dow === 6) maxH = 18; // Sábado
