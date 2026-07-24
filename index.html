@@ -298,7 +298,8 @@
 
   .barbers-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
+    max-width: 480px;
     gap: 1.5rem;
   }
 
@@ -494,7 +495,8 @@
 
   .barber-select-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
+    max-width: 360px;
     gap: 1rem;
     margin-bottom: 1.5rem;
   }
@@ -880,11 +882,6 @@
       <div class="barber-name">Pedro Vitor</div>
       <div class="barber-nick">// PV</div>
     </div>
-    <div class="barber-card">
-      <div class="barber-avatar">PH</div>
-      <div class="barber-name">Pedro Henrique</div>
-      <div class="barber-nick">// PH</div>
-    </div>
   </div>
 </section>
 
@@ -937,10 +934,6 @@
           <div class="barber-option" onclick="selectBarber(this, 'Pedro Vitor (PV)')">
             <div class="mini-avatar">PV</div>
             <div><div class="mini-name">Pedro Vitor</div><div class="mini-nick">// PV</div></div>
-          </div>
-          <div class="barber-option" onclick="selectBarber(this, 'Pedro Henrique (PH)')">
-            <div class="mini-avatar">PH</div>
-            <div><div class="mini-name">Pedro Henrique</div><div class="mini-nick">// PH</div></div>
           </div>
         </div>
         <div class="step-nav">
@@ -1691,15 +1684,34 @@ async function adminSaveMensalista() {
 }
 
 async function adminDeleteMensalista(id) {
-  if (!window.confirm('Remover mensalista?')) return;
+  if (!window.confirm('Remover mensalista e liberar todos os horários dele na agenda?')) return;
   try {
+    const resGet = await fetch(`${SB_URL}/rest/v1/mensalistas?id=eq.${id}&select=nome,telefone,barbeiro`, {
+      headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+    });
+    const rows = await resGet.json();
+    const mens = rows[0];
+
     const res = await fetch(`${SB_URL}/rest/v1/mensalistas?id=eq.${id}`, {
       method: 'DELETE',
       headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
     });
     if (!res.ok) { const e = await res.text(); throw new Error(e); }
-    showNotif('Mensalista removido!');
+
+    if (mens) {
+      await fetch(
+        `${SB_URL}/rest/v1/agendamentos?cliente_nome=eq.${encodeURIComponent(mens.nome)}&cliente_telefone=eq.${encodeURIComponent(mens.telefone)}&barbeiro=eq.${encodeURIComponent(mens.barbeiro)}&status=eq.confirmado`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` },
+          body: JSON.stringify({ status: 'excluido' })
+        }
+      );
+    }
+
+    showNotif('Mensalista removido e horários liberados na agenda!');
     adminLoadMensalistas();
+    adminLoad();
   } catch(e) {
     showNotif('Erro ao remover: ' + e.message);
   }
@@ -1831,7 +1843,6 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
         <select id="admin-filter-barber" onchange="adminLoad()" style="padding:8px 12px; border-radius:8px; border:1.5px solid var(--border); font-size:13px; background:var(--cream); color:var(--text); cursor:pointer; font-family:'DM Sans',sans-serif;">
           <option value="">Todos os barbeiros</option>
           <option value="Pedro Vitor (PV)">Pedro Vitor (PV)</option>
-          <option value="Pedro Henrique (PH)">Pedro Henrique (PH)</option>
         </select>
         <input type="date" id="admin-filter-date" onchange="adminLoad()" style="padding:8px 12px; border-radius:8px; border:1.5px solid var(--border); font-size:13px; background:var(--cream); color:var(--text); cursor:pointer;">
         <select id="admin-filter-status" onchange="adminLoad()" style="padding:8px 12px; border-radius:8px; border:1.5px solid var(--border); font-size:13px; background:var(--cream); color:var(--text); cursor:pointer; font-family:'DM Sans',sans-serif;">
@@ -1880,7 +1891,6 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
             <select id="m-barbeiro" style="width:100%; margin-top:4px; padding:10px 12px; border:1.5px solid var(--border); border-radius:8px; font-size:14px; background:var(--white); font-family:'DM Sans',sans-serif; outline:none;">
               <option value="">Selecione...</option>
               <option value="Pedro Vitor (PV)">Pedro Vitor (PV)</option>
-              <option value="Pedro Henrique (PH)">Pedro Henrique (PH)</option>
             </select>
           </div>
           <div>
